@@ -1,0 +1,74 @@
+# ══════════════════════════════════════════════════════
+# Backend CI/CD Pipeline
+#
+# Triggers on every push to main branch.
+# Steps:
+#   1. Checkout code
+#   2. Set up Python
+#   3. Install dependencies
+#   4. Run unit tests — if any test fails, deploy is BLOCKED
+#   5. Set up SAM CLI
+#   6. Configure AWS credentials
+#   7. sam build — package the Lambda function
+#   8. sam deploy — update infrastructure via CloudFormation
+# ══════════════════════════════════════════════════════
+
+name: Deploy Backend
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test-and-deploy:
+    name: Test then deploy via SAM
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # Step 1 — Check out code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2 — Install the Python version matching our Lambda runtime
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Step 3 — Install boto3 so tests can import it
+      - name: Install dependencies
+        run: |
+          pip install boto3 pytest
+
+      # Step 4 — Run unit tests
+      # If even one test fails, GitHub Actions stops here.
+      # sam build and sam deploy never run. Broken code never ships.
+      - name: Run tests
+        run: |
+          cd lambda
+          python -m pytest test_counter.py -v
+
+      # Step 5 — Install SAM CLI on the Actions runner
+      - name: Set up SAM CLI
+        uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+
+      # Step 6 — Authenticate with AWS using secrets
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ secrets.AWS_REGION }}
+
+      # Step 7 — Build the Lambda deployment package
+      - name: SAM build
+        run: sam build
+
+      # Step 8 — Deploy infrastructure changes to AWS
+      # Uses samconfig.toml for all settings so no flags needed here
+      - name: SAM deploy
+        run: sam deploy
