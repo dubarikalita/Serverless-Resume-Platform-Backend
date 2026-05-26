@@ -1,0 +1,68 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Description: >
+  Serverless Resume Platform backend visitor counter using
+  Lambda, API Gateway, and DynamoDB.
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 10
+    MemorySize: 128
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref VisitorCounterTable
+
+Resources:
+  VisitorCounterTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: serverless-resume-platform-counter-sam
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+
+  VisitorCounterApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: serverless-resume-platform-api-sam
+      StageName: prod
+      Cors:
+        AllowMethods: "'POST,OPTIONS'"
+        AllowHeaders: "'Content-Type'"
+        AllowOrigin: "'*'"
+
+  VisitorCounterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: serverless-resume-platform-counter-sam
+      CodeUri: lambda/
+      Handler: counter.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref VisitorCounterTable
+      Events:
+        CounterPost:
+          Type: Api
+          Properties:
+            Path: /count
+            Method: post
+            RestApiId: !Ref VisitorCounterApi
+
+Outputs:
+  ApiEndpoint:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${VisitorCounterApi}.execute-api.${AWS::Region}.amazonaws.com/prod/count"
+
+  FunctionArn:
+    Description: "Lambda function ARN"
+    Value: !GetAtt VisitorCounterFunction.Arn
+
+  TableName:
+    Description: "DynamoDB table name"
+    Value: !Ref VisitorCounterTable

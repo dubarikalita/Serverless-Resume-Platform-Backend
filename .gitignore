@@ -1,0 +1,8 @@
+.venv/
+.aws-sam/
+__pycache__/
+.pytest_cache/
+*.zip
+response.json
+options-*.json
+lambda-trust-policy.json
